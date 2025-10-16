@@ -59,6 +59,7 @@ El usuario puede registrar transacciones, categorizarlas y visualizar su histori
 ![Formulario](docs/mockups/02_form.png)  
 ![Detalle](docs/mockups/03_detail.png)  
 ![Diálogo Eliminar](docs/mockups/04_dialog_delete.png)
+![Pantalla Filtros](docs/mockups/05_filters.png)
 
 ---
 
