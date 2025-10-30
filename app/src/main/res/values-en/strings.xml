@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ExpenseNote</string>
+
+    <!-- Main Screen -->
+    <string name="balance_current">Current balance</string>
+    <string name="income_label">Income</string>
+    <string name="expenses_label">Expenses</string>
+    <string name="search_hint">Search transactions…</string>
+
+    <!-- Form Screen -->
+    <string name="new_transaction">New transaction</string>
+    <string name="edit_transaction">Edit transaction</string>
+    <string name="transaction_type">Transaction type</string>
+    <string name="type_expense">Expense</string>
+    <string name="type_income">Income</string>
+    <string name="amount_hint">Amount</string>
+    <string name="category_hint">Category</string>
+    <string name="date_hint">Date</string>
+    <string name="note_hint">Note (optional)</string>
+    <string name="photo_hint">Receipt photo (optional)</string>
+    <string name="photo_upload_text">Tap to add photo</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Detail Screen -->
+    <string name="transaction_detail">Transaction details</string>
+    <string name="label_category">Category</string>
+    <string name="label_date">Date</string>
+    <string name="label_type">Type</string>
+    <string name="label_note">Note</string>
+    <string name="label_receipt_photo">Receipt photo</string>
+    <string name="btn_edit">Edit</string>
+    <string name="btn_delete">Delete</string>
+
+    <!-- Delete Dialog -->
+    <string name="dialog_delete_title">Delete transaction?</string>
+    <string name="dialog_delete_message">This action cannot be undone. The transaction will be permanently deleted.</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_confirm">Delete</string>
+
+    <!-- Filters Screen -->
+    <string name="filters_title">Filters</string>
+    <string name="filter_type_all">All</string>
+    <string name="filter_type_expenses">Expenses</string>
+    <string name="filter_type_income">Income</string>
+    <string name="filter_date_range">Date range</string>
+    <string name="filter_date_from">From</string>
+    <string name="filter_date_to">To</string>
+    <string name="filter_categories">Categories</string>
+    <string name="filter_sort_by">Sort by</string>
+    <string name="results_found">Results found</string>
+    <string name="btn_clear_filters">Clear filters</string>
+    <string name="btn_apply_filters">Apply</string>
+
+    <!-- Categories -->
+    <string name="category_food">Food</string>
+    <string name="category_transport">Transport</string>
+    <string name="category_health">Health</string>
+    <string name="category_entertainment">Entertainment</string>
+    <string name="category_home">Home</string>
+    <string name="category_salary">Salary</string>
+    <string name="category_other">Other</string>
+
+    <!-- Sort Options -->
+    <string name="sort_date_newest">Date (newest first)</string>
+    <string name="sort_date_oldest">Date (oldest first)</string>
+    <string name="sort_amount_desc">Amount (high to low)</string>
+    <string name="sort_amount_asc">Amount (low to high)</string>
+    <string name="sort_category_az">Category (A–Z)</string>
+
+    <!-- Messages -->
+    <string name="transaction_saved">Transaction saved</string>
+    <string name="transaction_deleted">Transaction deleted</string>
+    <string name="error_fill_fields">Please fill in all required fields</string>
+    <string name="error_invalid_amount">Invalid amount</string>
+
+    <!-- Other -->
+    <string name="currency_symbol">$</string>
+    <string name="transactions_count">%d transactions</string>
+</resources>

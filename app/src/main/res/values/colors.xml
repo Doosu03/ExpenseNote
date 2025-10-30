@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#6C5CE7</color>
+    <color name="primary_dark">#5F4FD9</color>
+    <color name="primary_light">#F0F0FF</color>
+
+    <!-- Accent Colors -->
+    <color name="expense">#FF6B6B</color>
+    <color name="expense_light">#FFE5E5</color>
+    <color name="income">#51CF66</color>
+    <color name="income_light">#E5F5E5</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#333333</color>
+    <color name="text_secondary">#999999</color>
+
+    <!-- Background Colors -->
+    <color name="background">#F5F5F5</color>
+    <color name="background_light">#F9F9F9</color>
+
+    <!-- Other Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="stroke">#E0E0E0</color>
+    <color name="divider">#F0F0F0</color>
+</resources>
