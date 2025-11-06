@@ -124,22 +124,22 @@ class FiltersActivity : AppCompatActivity() {
 
     private fun setupCategoryFilters() {
         binding.cbFood.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Alimentación", isChecked)
+            updateCategory("Food", isChecked)
         }
         binding.cbTransport.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Transporte", isChecked)
+            updateCategory("Transport", isChecked)
         }
         binding.cbHealth.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Salud", isChecked)
+            updateCategory("Health", isChecked)
         }
         binding.cbEntertainment.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Entretenimiento", isChecked)
+            updateCategory("Entertainment", isChecked)
         }
         binding.cbHome.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Hogar", isChecked)
+            updateCategory("Home", isChecked)
         }
         binding.cbSalary.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Salario", isChecked)
+            updateCategory("Salary", isChecked)
         }
     }
 

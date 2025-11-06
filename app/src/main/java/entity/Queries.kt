@@ -11,10 +11,8 @@ data class TransactionQuery(
     val text: String? = null,
     val categoryIds: Set<Long> = emptySet(),
     val dateRange: DateRange? = null,
-    val type: MovementType? = null
+    val type: TransactionType? = null
 )
-
-annotation class MovementType
 
 data class Totals(
     val income: Double,

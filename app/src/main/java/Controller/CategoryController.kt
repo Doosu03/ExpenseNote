@@ -10,13 +10,13 @@ class CategoryController(private val data: IDataManager) {
     fun get(id: Long): Category? = data.getCategory(id)
 
     fun create(input: Category): Category {
-        require(input.name.isNotBlank()) { "El nombre de la categoría es requerido." }
+        require(input.name.isNotBlank()) { "Category name is required." }
         return data.insertCategory(input)
     }
 
     fun update(input: Category): Boolean {
-        require(input.id != 0L) { "El id es requerido para actualizar." }
-        require(input.name.isNotBlank()) { "El nombre de la categoría es requerido." }
+        require(input.id != 0L) { "Id is required to update." }
+        require(input.name.isNotBlank()) { "Category name is required." }
         return data.updateCategory(input)
     }
 
