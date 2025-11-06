@@ -1,20 +1,25 @@
 package com.example.expensenote
 
 // ============================================
-// DetailActivity.kt - Detalle
+// DetailActivity.kt - Detail
 // ============================================
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.example.expensenote.Data.DataLocator
 import com.example.expensenote.databinding.ActivityDetailBinding
-import com.google.android.filament.View
+import com.example.expensenote.entity.Transaction
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 
 class DetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDetailBinding
     private var transactionId: Long = -1
+    private var current: Transaction? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,11 +37,9 @@ class DetailActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
-            title = "Detalle del movimiento"
+            title = "Transaction details"
         }
-        binding.toolbar.setNavigationOnClickListener {
-            finish()
-        }
+        binding.toolbar.setNavigationOnClickListener { finish() }
     }
 
     private fun setupButtons() {
@@ -46,13 +49,11 @@ class DetailActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        binding.btnDelete.setOnClickListener {
-            showDeleteDialog()
-        }
+        binding.btnDelete.setOnClickListener { showDeleteDialog() }
     }
 
     private fun showDeleteDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_delete, null)
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_delete, null)
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setView(dialogView)
@@ -65,54 +66,54 @@ class DetailActivity : AppCompatActivity() {
         dialogView.findViewById<View>(R.id.btnDialogConfirm).setOnClickListener {
             deleteTransaction()
             dialog.dismiss()
-            finish()
         }
 
         dialog.show()
     }
 
     private fun loadTransaction() {
-        // Cargar desde Room
-        // viewModel.getTransaction(transactionId).observe(this) { transaction ->
-        //     displayTransaction(transaction)
-        // }
-
-        // Ejemplo con datos dummy:
-        displayTransaction(
-            Transaction(
-                id = transactionId,
-                amount = -6500.0,
-                category = "Alimentación",
-                type = TransactionType.EXPENSE,
-                date = "15 Octubre 2025",
-                note = "Almuerzo en restaurante"
-            )
-        )
+        val tx = DataLocator.data.getTransaction(transactionId)
+        if (tx == null) {
+            finish()
+            return
+        }
+        current = tx
+        displayTransaction(tx)
     }
 
     private fun displayTransaction(transaction: Transaction) {
         binding.apply {
-            tvDetailAmount.text = formatCurrency(transaction.amount)
-            tvDetailType.text = "${transaction.type.displayName} • ${transaction.category}"
-            tvDetailCategory.text = "🍔 ${transaction.category}"
+            tvDetailAmount.text = formatCurrency(kotlin.math.abs(transaction.amount))
+            val typeLabel = transaction.type.name.lowercase().replaceFirstChar { it.titlecase() }
+            tvDetailType.text = "$typeLabel • ${transaction.category}"
+            tvDetailCategory.text = "🍔 ${transaction.category}" // you can map emoji by category if needed
             tvDetailDate.text = transaction.date
-            tvDetailTransactionType.text = transaction.type.displayName
+            tvDetailTransactionType.text = typeLabel
             tvDetailNote.text = transaction.note
 
-            // Cargar foto si existe
-            transaction.photoUri?.let { uri ->
-                // Cargar imagen con Glide o Coil
-                // Glide.with(this@DetailActivity).load(uri).into(ivReceiptPhoto)
+            transaction.photoUri?.let { uriStr ->
+                // Load with your preferred image loader later (Coil/Glide)
+                // Coil example:
+                // ivReceiptPhoto.load(uriStr)
             }
         }
     }
 
     private fun deleteTransaction() {
-        // Eliminar de Room
-        // viewModel.deleteTransaction(transactionId)
+        if (transactionId != -1L) {
+            DataLocator.data.deleteTransaction(transactionId)
+            Snackbar.make(binding.root, getString(R.string.transaction_deleted), Snackbar.LENGTH_SHORT).show()
+            finish()
+        }
     }
 
     private fun formatCurrency(amount: Double): String {
-        return "₡ ${String.format("%,.0f", Math.abs(amount))}"
+        return "₡ ${String.format("%,.0f", amount)}"
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reload in case it was edited
+        loadTransaction()
     }
 }
