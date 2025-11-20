@@ -4,7 +4,7 @@ package com.example.expensenote
 // DetailActivity.kt - Detail
 // ============================================
 
-import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -44,7 +44,7 @@ class DetailActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.btnEdit.setOnClickListener {
-            val intent = Intent(this, FormActivity::class.java)
+            val intent = android.content.Intent(this, FormActivity::class.java)
             intent.putExtra("TRANSACTION_ID", transactionId)
             startActivity(intent)
         }
@@ -86,15 +86,15 @@ class DetailActivity : AppCompatActivity() {
             tvDetailAmount.text = formatCurrency(kotlin.math.abs(transaction.amount))
             val typeLabel = transaction.type.name.lowercase().replaceFirstChar { it.titlecase() }
             tvDetailType.text = "$typeLabel • ${transaction.category}"
-            tvDetailCategory.text = "🍔 ${transaction.category}" // you can map emoji by category if needed
+            tvDetailCategory.text = "🍔 ${transaction.category}" // could map emoji by category
             tvDetailDate.text = transaction.date
             tvDetailTransactionType.text = typeLabel
             tvDetailNote.text = transaction.note
 
-            transaction.photoUri?.let { uriStr ->
-                // Load with your preferred image loader later (Coil/Glide)
-                // Coil example:
-                // ivReceiptPhoto.load(uriStr)
+            when {
+                transaction.photoBitmap != null -> ivReceiptPhoto.setImageBitmap(transaction.photoBitmap)
+                transaction.photoUri != null -> ivReceiptPhoto.setImageURI(Uri.parse(transaction.photoUri))
+                else -> ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
             }
         }
     }

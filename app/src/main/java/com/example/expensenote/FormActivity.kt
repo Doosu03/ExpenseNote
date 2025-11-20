@@ -5,8 +5,11 @@ package com.example.expensenote
 // ============================================
 
 import android.app.DatePickerDialog
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -24,10 +27,14 @@ import java.util.*
 class FormActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFormBinding
+
     private var selectedType: TransactionType = TransactionType.EXPENSE
     private var selectedDate: Date = Date()
     private var photoUri: Uri? = null
     private var transactionId: Long? = null
+
+    // Bitmap kept in memory to store on save (as required by the task)
+    private var selectedReceiptBitmap: Bitmap? = null
 
     // Pick from gallery
     private val pickImageLauncher = registerForActivityResult(
@@ -35,8 +42,8 @@ class FormActivity : AppCompatActivity() {
     ) { uri ->
         uri?.let {
             photoUri = it
-            // TODO: show preview if you have an ImageView
-            // binding.ivPhotoPreview.setImageURI(it)
+            selectedReceiptBitmap = decodeBitmapFromUri(it)
+            showPreview(selectedReceiptBitmap)
         }
     }
 
@@ -44,10 +51,9 @@ class FormActivity : AppCompatActivity() {
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success) {
-            // Photo saved in photoUri
-            // TODO: show preview
-            // binding.ivPhotoPreview.setImageURI(photoUri)
+        if (success && photoUri != null) {
+            selectedReceiptBitmap = decodeBitmapFromUri(photoUri!!)
+            showPreview(selectedReceiptBitmap)
         }
     }
 
@@ -215,7 +221,8 @@ class FormActivity : AppCompatActivity() {
             type = selectedType,
             date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(selectedDate),
             note = note,
-            photoUri = photoUri?.toString()
+            photoUri = photoUri?.toString(),
+            photoBitmap = selectedReceiptBitmap   // <-- store Bitmap as requested
         )
 
         if (createMode) {
@@ -237,9 +244,56 @@ class FormActivity : AppCompatActivity() {
         binding.etNote.setText(tx.note)
         selectType(tx.type)
         binding.etDate.setText(tx.date)
-        tx.photoUri?.let {
-            photoUri = Uri.parse(it)
-            // binding.ivPhotoPreview.setImageURI(photoUri)
+
+        tx.photoBitmap?.let {
+            selectedReceiptBitmap = it
+            showPreview(it)
+        } ?: run {
+            tx.photoUri?.let {
+                photoUri = Uri.parse(it)
+                selectedReceiptBitmap = decodeBitmapFromUri(photoUri!!)
+                showPreview(selectedReceiptBitmap)
+            }
+        }
+    }
+
+    // ---- Image helpers ----
+
+    private fun decodeBitmapFromUri(uri: Uri, maxSize: Int = 1280): Bitmap? {
+        return try {
+            // Read stream to byte[] to safely decode twice (bounds + final)
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+            options.inSampleSize = calculateInSampleSize(options, maxSize, maxSize)
+            options.inJustDecodeBounds = false
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            var halfHeight = height / 2
+            var halfWidth = width / 2
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
+
+    private fun showPreview(bitmap: Bitmap?) {
+        if (bitmap != null) {
+            binding.ivPhotoPreview.visibility = View.VISIBLE
+            binding.ivPhotoPreview.setImageBitmap(bitmap)
         }
     }
 }
