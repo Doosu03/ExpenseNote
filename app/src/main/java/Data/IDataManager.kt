@@ -1,6 +1,6 @@
 package com.example.expensenote.Data
 
-import com.example.expensenote.Entity.*
+import com.example.expensenote.entity.*
 import com.example.expensenote.entity.DateRange
 import com.example.expensenote.entity.Transaction
 import com.example.expensenote.entity.TransactionQuery

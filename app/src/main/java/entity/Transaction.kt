@@ -1,6 +1,10 @@
 package com.example.expensenote.entity
 
-enum class TransactionType { EXPENSE, INCOME }
+enum class TransactionType(val displayName: String) {
+    INCOME("Ingreso"),
+    EXPENSE("Gasto")
+}
+
 
 data class Transaction(
     val id: Long,
