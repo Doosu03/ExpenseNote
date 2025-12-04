@@ -8,7 +8,8 @@ enum class TransactionType(val displayName: String) {
 }
 
 data class Transaction(
-    val id: Long,
+    val id: Long = 0,
+    val stringId: String = "",
     val amount: Double,
     val category: String,
     val type: TransactionType,

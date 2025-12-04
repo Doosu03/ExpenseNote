@@ -1,25 +1,27 @@
 package com.example.expensenote
 
-// ============================================
-// FormActivity.kt - Form (Create / Update)
-// ============================================
-
 import android.app.DatePickerDialog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
-import com.example.expensenote.Data.DataLocator
+import androidx.lifecycle.lifecycleScope
+import com.example.expensenote.Controller.TransactionController
+import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityFormBinding
 import com.example.expensenote.entity.Transaction
 import com.example.expensenote.entity.TransactionType
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,14 +29,16 @@ import java.util.*
 class FormActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFormBinding
+    private val controller = TransactionController(RemoteDataManager)
 
     private var selectedType: TransactionType = TransactionType.EXPENSE
     private var selectedDate: Date = Date()
     private var photoUri: Uri? = null
-    private var transactionId: Long? = null
+    private var transactionStringId: String? = null  // Firebase usa String IDs
 
     // Bitmap kept in memory to store on save (as required by the task)
     private var selectedReceiptBitmap: Bitmap? = null
+    private var uploadedPhotoUrl: String? = null  // URL devuelta por el API
 
     // Pick from gallery
     private val pickImageLauncher = registerForActivityResult(
@@ -62,7 +66,10 @@ class FormActivity : AppCompatActivity() {
         binding = ActivityFormBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        transactionId = intent.getLongExtra("TRANSACTION_ID", -1).takeIf { it != -1L }
+        transactionStringId = intent.getStringExtra("TRANSACTION_STRING_ID")
+
+        // DEBUG: Verificar si se recibió el ID
+        android.util.Log.d("FormActivity", "Received ID: $transactionStringId")
 
         setupToolbar()
         setupTypeSelector()
@@ -71,8 +78,8 @@ class FormActivity : AppCompatActivity() {
         setupPhotoUpload()
         setupButtons()
 
-        if (transactionId != null) {
-            loadTransaction(transactionId!!)
+        if (transactionStringId != null && transactionStringId!!.isNotEmpty()) {
+            loadTransaction(transactionStringId!!)
         }
     }
 
@@ -80,7 +87,7 @@ class FormActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
-            title = if (transactionId == null) "New transaction" else "Edit transaction"
+            title = if (transactionStringId == null) "New transaction" else "Edit transaction"
         }
         binding.toolbar.setNavigationOnClickListener { finish() }
     }
@@ -180,7 +187,7 @@ class FormActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.btnSave.setOnClickListener {
-            if (transactionId == null) {
+            if (transactionStringId == null) {
                 // Create directly
                 saveTransaction(createMode = true)
             } else {
@@ -214,45 +221,110 @@ class FormActivity : AppCompatActivity() {
             return
         }
 
-        val tx = Transaction(
-            id = transactionId ?: 0,
-            amount = if (selectedType == TransactionType.EXPENSE) -amount else amount,
-            category = category,
-            type = selectedType,
-            date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(selectedDate),
-            note = note,
-            photoUri = photoUri?.toString(),
-            photoBitmap = selectedReceiptBitmap   // <-- store Bitmap as requested
-        )
+        lifecycleScope.launch {
+            try {
+                // 1. Subir imagen si hay una nueva
+                if (selectedReceiptBitmap != null && uploadedPhotoUrl == null) {
+                    val base64 = bitmapToBase64(selectedReceiptBitmap!!)
+                    uploadedPhotoUrl = RemoteDataManager.uploadImageSuspend(base64)
+                }
 
-        if (createMode) {
-            DataLocator.data.insertTransaction(tx)
-            Snackbar.make(binding.root, getString(R.string.transaction_saved), Snackbar.LENGTH_SHORT).show()
-        } else {
-            DataLocator.data.updateTransaction(tx)
-            Snackbar.make(binding.root, getString(R.string.transaction_saved), Snackbar.LENGTH_SHORT).show()
+                // 2. Crear objeto Transaction
+                val tx = Transaction(
+                    id = 0, // No usado
+                    stringId = transactionStringId ?: "", // IMPORTANTE: Usar el stringId guardado
+                    amount = if (selectedType == TransactionType.EXPENSE) -amount else amount,
+                    category = category,
+                    type = selectedType,
+                    date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(selectedDate),
+                    note = note,
+                    photoUri = uploadedPhotoUrl,  // Guardar URL de Firebase Storage
+                    photoBitmap = null  // No guardamos Bitmap en API
+                )
+
+                // DEBUG: Verificar el stringId antes de actualizar
+                android.util.Log.d("FormActivity", "Updating with stringId: ${tx.stringId}")
+
+                // 3. Crear o actualizar
+                if (createMode) {
+                    val created = controller.create(tx)
+                    if (created != null) {
+                        Snackbar.make(
+                            binding.root,
+                            getString(R.string.transaction_saved),
+                            Snackbar.LENGTH_SHORT
+                        ).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this@FormActivity, "Error creating transaction", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    val updated = controller.update(tx)
+                    if (updated) {
+                        Snackbar.make(
+                            binding.root,
+                            getString(R.string.transaction_saved),
+                            Snackbar.LENGTH_SHORT
+                        ).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this@FormActivity, "Error updating transaction", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@FormActivity,
+                    "Error: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
-
-        finish()
     }
 
-    private fun loadTransaction(id: Long) {
-        val tx = DataLocator.data.getTransaction(id) ?: return
-        // Populate fields
-        binding.etAmount.setText(kotlin.math.abs(tx.amount).toString())
-        binding.actvCategory.setText(tx.category, false)
-        binding.etNote.setText(tx.note)
-        selectType(tx.type)
-        binding.etDate.setText(tx.date)
+    private fun loadTransaction(id: String) {
+        lifecycleScope.launch {
+            try {
+                android.util.Log.d("FormActivity", "Loading transaction with ID: $id")
 
-        tx.photoBitmap?.let {
-            selectedReceiptBitmap = it
-            showPreview(it)
-        } ?: run {
-            tx.photoUri?.let {
-                photoUri = Uri.parse(it)
-                selectedReceiptBitmap = decodeBitmapFromUri(photoUri!!)
-                showPreview(selectedReceiptBitmap)
+                val tx = controller.get(id)
+                if (tx == null) {
+                    Toast.makeText(this@FormActivity, "Transaction not found", Toast.LENGTH_SHORT).show()
+                    finish()
+                    return@launch
+                }
+
+                // IMPORTANTE: Guardar el stringId para poder editar
+                transactionStringId = tx.stringId
+                android.util.Log.d("FormActivity", "Loaded transaction, stringId: $transactionStringId")
+
+                // Populate fields
+                binding.etAmount.setText(kotlin.math.abs(tx.amount).toString())
+                binding.actvCategory.setText(tx.category, false)
+                binding.etNote.setText(tx.note)
+                selectType(tx.type)
+
+                // Parse date to set in calendar
+                try {
+                    val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                    selectedDate = dateFormat.parse(tx.date) ?: Date()
+                    binding.etDate.setText(tx.date)
+                } catch (e: Exception) {
+                    binding.etDate.setText(tx.date)
+                }
+
+                // Cargar imagen si existe URL
+                tx.photoUri?.let { url ->
+                    uploadedPhotoUrl = url
+                    // TODO: Cargar imagen desde URL con Glide/Coil si quieres mostrar preview
+                    // Por ahora solo guardamos la URL
+                }
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@FormActivity,
+                    "Error loading transaction: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
             }
         }
     }
@@ -261,7 +333,6 @@ class FormActivity : AppCompatActivity() {
 
     private fun decodeBitmapFromUri(uri: Uri, maxSize: Int = 1280): Bitmap? {
         return try {
-            // Read stream to byte[] to safely decode twice (bounds + final)
             val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
 
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -295,5 +366,12 @@ class FormActivity : AppCompatActivity() {
             binding.ivPhotoPreview.visibility = View.VISIBLE
             binding.ivPhotoPreview.setImageBitmap(bitmap)
         }
+    }
+
+    private fun bitmapToBase64(bitmap: Bitmap): String {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+        val byteArray = outputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.NO_WRAP)
     }
 }

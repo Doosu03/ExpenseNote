@@ -2,20 +2,26 @@ package com.example.expensenote
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.addTextChangedListener
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.expensenote.Controller.TransactionController
 import com.example.expensenote.Data.DataLocator
+import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityMainBinding
 import com.example.expensenote.entity.Transaction
 import com.example.expensenote.entity.TransactionType
 import com.example.expensenote.entity.TransactionQuery
 import com.example.expensenote.ui.adapter.TransactionAdapter
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var transactionAdapter: TransactionAdapter
+    private val controller = TransactionController(RemoteDataManager)
 
     private var isSearching: Boolean = false
     private var lastLoaded: List<Transaction> = emptyList()
@@ -77,8 +83,36 @@ class MainActivity : AppCompatActivity() {
         categories: ArrayList<String>?,
         sortBy: String?
     ) {
-        // For this task delivery we keep filters simple (not required by professor yet)
-        loadTransactions()
+        lifecycleScope.launch {
+            try {
+                // Obtener todas las transacciones
+                var transactions = controller.list()
+
+                // Filtrar por tipo si está seleccionado
+                filterType?.let { type ->
+                    val transactionType = TransactionType.valueOf(type)
+                    transactions = transactions.filter { it.type == transactionType }
+                }
+
+                // Filtrar por categorías si hay seleccionadas
+                if (categories != null && categories.isNotEmpty()) {
+                    transactions = transactions.filter { categories.contains(it.category) }
+                }
+
+                // Actualizar la lista y balance
+                lastLoaded = transactions
+                transactionAdapter.submitList(transactions)
+                updateBalance(transactions)
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Error aplicando filtros: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                // Si hay error, mostrar todas las transacciones
+                loadTransactions()
+            }
+        }
     }
 
     private fun setupRecyclerView() {
@@ -86,12 +120,12 @@ class MainActivity : AppCompatActivity() {
             // When searching, tap goes straight to EDIT mode (FormActivity)
             if (isSearching) {
                 val intent = Intent(this, FormActivity::class.java)
-                intent.putExtra("TRANSACTION_ID", transaction.id)
+                intent.putExtra("TRANSACTION_STRING_ID", transaction.stringId)
                 startActivity(intent)
             } else {
                 // Normal flow → detail
                 val intent = Intent(this, DetailActivity::class.java)
-                intent.putExtra("TRANSACTION_ID", transaction.id)
+                intent.putExtra("TRANSACTION_STRING_ID", transaction.stringId)
                 startActivity(intent)
             }
         }
@@ -116,10 +150,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadTransactions() {
-        val transactions = DataLocator.data.getTransactions()
-        lastLoaded = transactions
-        transactionAdapter.submitList(transactions)
-        updateBalance(transactions)
+        lifecycleScope.launch {
+            try {
+                val transactions = controller.list()
+                lastLoaded = transactions
+                transactionAdapter.submitList(transactions)
+                updateBalance(transactions)
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Error loading transactions: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     private fun updateBalance(transactions: List<Transaction>) {
@@ -136,14 +180,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun filterTransactions(query: String) {
         isSearching = query.isNotBlank()
-        val result = if (query.isBlank()) {
-            DataLocator.data.getTransactions()
-        } else {
-            DataLocator.data.getTransactions(TransactionQuery(text = query))
+
+        lifecycleScope.launch {
+            try {
+                val result = if (query.isBlank()) {
+                    controller.list()
+                } else {
+                    controller.list(TransactionQuery(text = query))
+                }
+                lastLoaded = result
+                transactionAdapter.submitList(result)
+                updateBalance(result)
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Error searching: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
-        lastLoaded = result
-        transactionAdapter.submitList(result)
-        updateBalance(result)
     }
 
     private fun formatCurrency(amount: Double): String {
