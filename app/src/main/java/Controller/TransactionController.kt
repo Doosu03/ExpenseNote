@@ -16,6 +16,7 @@ class TransactionController(private val data: RemoteDataManager) {
 
     suspend fun create(input: Transaction): Transaction? {
         require(input.amount != 0.0) { "Amount must be different from 0." }
+        // Normalize amount sign according to type: INCOME = positive, EXPENSE = negative
         val normalized = when (input.type) {
             TransactionType.EXPENSE -> input.copy(amount = -abs(input.amount))
             TransactionType.INCOME  -> input.copy(amount = abs(input.amount))
@@ -24,8 +25,9 @@ class TransactionController(private val data: RemoteDataManager) {
     }
 
     suspend fun update(input: Transaction): Boolean {
-        require(input.id != 0L) { "Id is required to update." }
+        require(input.stringId.isNotEmpty()) { "Id is required to update." }
         require(input.amount != 0.0) { "Amount must be different from 0." }
+        // Normalize amount sign according to type
         val normalized = when (input.type) {
             TransactionType.EXPENSE -> input.copy(amount = -abs(input.amount))
             TransactionType.INCOME  -> input.copy(amount = abs(input.amount))
