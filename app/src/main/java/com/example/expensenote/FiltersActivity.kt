@@ -1,25 +1,38 @@
 package com.example.expensenote
 
-// ============================================
-// FiltersActivity.kt - Filtros
-// ============================================
-
 import android.app.DatePickerDialog
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.widget.ArrayAdapter
+import android.widget.CheckBox
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.example.expensenote.Controller.CategoryController
+import com.example.expensenote.Controller.TransactionController
+import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityFiltersBinding
+import com.example.expensenote.entity.Category
+import com.example.expensenote.entity.TransactionQuery
 import com.example.expensenote.entity.TransactionType
+import com.google.android.material.card.MaterialCardView
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 class FiltersActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFiltersBinding
+    private val categoryController = CategoryController(RemoteDataManager)
+    private val transactionController = TransactionController(RemoteDataManager)
+
     private var selectedType: TransactionType? = null
-    private var dateFrom: Date? = null
-    private var dateTo: Date? = null
-    private val selectedCategories = mutableSetOf<String>()
+    private val selectedCategoryIds = mutableSetOf<Long>()
+
+    private var allCategories: List<Category> = emptyList()
+    private val categoryCheckboxes = mutableMapOf<Long, CheckBox>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,10 +41,9 @@ class FiltersActivity : AppCompatActivity() {
 
         setupToolbar()
         setupTypeFilters()
-        setupDateFilters()
-        setupCategoryFilters()
-        setupSortSpinner()
         setupButtons()
+
+        loadCategories()
     }
 
     private fun setupToolbar() {
@@ -63,13 +75,11 @@ class FiltersActivity : AppCompatActivity() {
     }
 
     private fun updateTypeButtons() {
-        // Reset all buttons
         listOf(binding.btnFilterAll, binding.btnFilterExpense, binding.btnFilterIncome).forEach {
             it.strokeColor = getColorStateList(R.color.stroke)
             it.setBackgroundColor(getColor(android.R.color.transparent))
         }
 
-        // Highlight selected
         when (selectedType) {
             null -> {
                 binding.btnFilterAll.strokeColor = getColorStateList(R.color.primary)
@@ -88,82 +98,128 @@ class FiltersActivity : AppCompatActivity() {
         updateResultsCount()
     }
 
-    private fun setupDateFilters() {
-        val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale("es"))
-
-        binding.etDateFrom.setOnClickListener {
-            showDatePicker { date ->
-                dateFrom = date
-                binding.etDateFrom.setText(dateFormat.format(date))
+    private fun loadCategories() {
+        lifecycleScope.launch {
+            try {
+                allCategories = categoryController.list()
+                displayCategories(allCategories)
                 updateResultsCount()
-            }
-        }
-
-        binding.etDateTo.setOnClickListener {
-            showDatePicker { date ->
-                dateTo = date
-                binding.etDateTo.setText(dateFormat.format(date))
-                updateResultsCount()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@FiltersActivity,
+                    "Error loading categories: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
 
-    private fun showDatePicker(onDateSelected: (Date) -> Unit) {
-        val calendar = Calendar.getInstance()
-        DatePickerDialog(
-            this,
-            { _, year, month, dayOfMonth ->
-                calendar.set(year, month, dayOfMonth)
-                onDateSelected(calendar.time)
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
-    }
+    private fun displayCategories(categories: List<Category>) {
+        // Limpiar el contenedor de categorías (lo crearemos dinámicamente)
+        val categoriesContainer = findViewById<LinearLayout>(R.id.llCategoriesContainer)
+        categoriesContainer?.removeAllViews()
 
-    private fun setupCategoryFilters() {
-        binding.cbFood.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Food", isChecked)
-        }
-        binding.cbTransport.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Transport", isChecked)
-        }
-        binding.cbHealth.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Health", isChecked)
-        }
-        binding.cbEntertainment.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Entertainment", isChecked)
-        }
-        binding.cbHome.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Home", isChecked)
-        }
-        binding.cbSalary.setOnCheckedChangeListener { _, isChecked ->
-            updateCategory("Salary", isChecked)
+        categories.forEach { category ->
+            val categoryCard = createCategoryCard(category)
+            categoriesContainer?.addView(categoryCard)
         }
     }
 
-    private fun updateCategory(category: String, isSelected: Boolean) {
+    private fun createCategoryCard(category: Category): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 24 // 10dp en px
+            }
+            radius = 30f // 10dp
+            strokeWidth = 6 // 2dp
+            strokeColor = getColor(R.color.stroke)
+            cardElevation = 0f
+            setCardBackgroundColor(getColor(R.color.background_light))
+        }
+
+        val contentLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(36, 36, 36, 36) // 12dp
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        val checkbox = CheckBox(this).apply {
+            buttonTintList = getColorStateList(R.color.primary)
+            setOnCheckedChangeListener { _, isChecked ->
+                updateCategorySelection(category.id, isChecked)
+                // Actualizar el stroke del card
+                card.strokeColor = if (isChecked) {
+                    getColor(R.color.primary)
+                } else {
+                    getColor(R.color.stroke)
+                }
+            }
+        }
+        categoryCheckboxes[category.id] = checkbox
+
+        val categoryName = TextView(this).apply {
+            text = "${getCategoryIcon(category.name)} ${getCategoryDisplayName(category.name)}"
+            textSize = 15f
+            setTextColor(getColor(R.color.text_primary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply {
+                marginStart = 24 // 8dp
+            }
+        }
+
+        val countText = TextView(this).apply {
+            text = "0 movimientos" // Se actualizará dinámicamente
+            textSize = 13f
+            setTextColor(getColor(R.color.text_secondary))
+            tag = "count_${category.id}" // Para actualizar después
+        }
+
+        contentLayout.addView(checkbox)
+        contentLayout.addView(categoryName)
+        contentLayout.addView(countText)
+        card.addView(contentLayout)
+
+        return card
+    }
+
+    private fun getCategoryIcon(categoryName: String): String {
+        return when (categoryName) {
+            "Food" -> "🍔"
+            "Transport" -> "🚌"
+            "Health" -> "🏥"
+            "Entertainment" -> "🎮"
+            "Home" -> "🏠"
+            "Salary" -> "💰"
+            else -> "📌"
+        }
+    }
+
+    private fun getCategoryDisplayName(categoryName: String): String {
+        return when (categoryName) {
+            "Food" -> "Alimentación"
+            "Transport" -> "Transporte"
+            "Health" -> "Salud"
+            "Entertainment" -> "Entretenimiento"
+            "Home" -> "Hogar"
+            "Salary" -> "Salario"
+            else -> categoryName
+        }
+    }
+
+    private fun updateCategorySelection(categoryId: Long, isSelected: Boolean) {
         if (isSelected) {
-            selectedCategories.add(category)
+            selectedCategoryIds.add(categoryId)
         } else {
-            selectedCategories.remove(category)
+            selectedCategoryIds.remove(categoryId)
         }
         updateResultsCount()
-    }
-
-    private fun setupSortSpinner() {
-        val sortOptions = arrayOf(
-            "Fecha (más reciente)",
-            "Fecha (más antiguo)",
-            "Monto (mayor a menor)",
-            "Monto (menor a mayor)",
-            "Categoría (A-Z)"
-        )
-
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, sortOptions)
-        binding.actvSortBy.setAdapter(adapter)
-        binding.actvSortBy.setText(sortOptions[0], false)
     }
 
     private fun setupButtons() {
@@ -178,40 +234,75 @@ class FiltersActivity : AppCompatActivity() {
 
     private fun clearAllFilters() {
         selectedType = null
-        dateFrom = null
-        dateTo = null
-        selectedCategories.clear()
+        selectedCategoryIds.clear()
 
-        binding.etDateFrom.text?.clear()
-        binding.etDateTo.text?.clear()
-        binding.cbFood.isChecked = false
-        binding.cbTransport.isChecked = false
-        binding.cbHealth.isChecked = false
-        binding.cbEntertainment.isChecked = false
-        binding.cbHome.isChecked = false
-        binding.cbSalary.isChecked = false
+        // Desmarcar todos los checkboxes
+        categoryCheckboxes.values.forEach { it.isChecked = false }
 
         updateTypeButtons()
         updateResultsCount()
     }
 
     private fun applyFilters() {
-        // Aplicar filtros y devolver resultado
+        // Convertir selectedCategoryIds (Long) a nombres de categorías (String)
+        val selectedCategoryNames = allCategories
+            .filter { selectedCategoryIds.contains(it.id) }
+            .map { it.name }
+
         val intent = intent.apply {
             putExtra("FILTER_TYPE", selectedType?.name)
-            putExtra("FILTER_DATE_FROM", dateFrom?.time)
-            putExtra("FILTER_DATE_TO", dateTo?.time)
-            putStringArrayListExtra("FILTER_CATEGORIES", ArrayList(selectedCategories))
-            putExtra("SORT_BY", binding.actvSortBy.text.toString())
+            putStringArrayListExtra("FILTER_CATEGORIES", ArrayList(selectedCategoryNames))
         }
         setResult(RESULT_OK, intent)
         finish()
     }
 
     private fun updateResultsCount() {
-        // Aquí calcularías el número real de transacciones que coinciden con los filtros
-        // Ejemplo:
-        val count = 28 // Este número vendría de tu ViewModel/Repository
-        binding.tvResultsCount.text = "$count movimientos"
+        lifecycleScope.launch {
+            try {
+                // Obtener TODAS las transacciones primero
+                val allTransactions = transactionController.list()
+
+                // Filtrar manualmente según los criterios seleccionados
+                var filteredTransactions = allTransactions
+
+                // Filtrar por tipo
+                if (selectedType != null) {
+                    filteredTransactions = filteredTransactions.filter { it.type == selectedType }
+                }
+
+                // Filtrar por categorías seleccionadas
+                if (selectedCategoryIds.isNotEmpty()) {
+                    val categoryNames = allCategories
+                        .filter { selectedCategoryIds.contains(it.id) }
+                        .map { it.name }
+                    filteredTransactions = filteredTransactions.filter { categoryNames.contains(it.category) }
+                }
+
+                // TODO: Filtrar por rango de fechas cuando se implemente
+
+                val count = filteredTransactions.size
+                binding.tvResultsCount.text = "$count movimientos"
+
+                // Actualizar contadores por categoría con TODAS las transacciones
+                updateCategoryCounts(allTransactions)
+            } catch (e: Exception) {
+                binding.tvResultsCount.text = "0 movimientos"
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun updateCategoryCounts(transactions: List<com.example.expensenote.entity.Transaction>) {
+        // Contar transacciones por categoría
+        val countsByCategory = transactions.groupBy { it.category }.mapValues { it.value.size }
+
+        // Actualizar los TextViews de conteo
+        allCategories.forEach { category ->
+            val countView = findViewById<LinearLayout>(R.id.llCategoriesContainer)
+                ?.findViewWithTag<TextView>("count_${category.id}")
+            val count = countsByCategory[category.name] ?: 0
+            countView?.text = "$count movimientos"
+        }
     }
 }

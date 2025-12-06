@@ -1,24 +1,24 @@
 package com.example.expensenote.Controller
 
-import com.example.expensenote.Data.IDataManager
+import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.entity.Category
 
-class CategoryController(private val data: IDataManager) {
+class CategoryController(private val data: RemoteDataManager) {
 
-    fun list(): List<Category> = data.getCategories()
+    suspend fun list(): List<Category> = data.getCategoriesSuspend()
 
-    fun get(id: Long): Category? = data.getCategory(id)
+    suspend fun get(id: String): Category? = data.getCategorySuspend(id)
 
-    fun create(input: Category): Category {
+    suspend fun create(input: Category): Category? {
         require(input.name.isNotBlank()) { "Category name is required." }
-        return data.insertCategory(input)
+        return data.insertCategorySuspend(input)
     }
 
-    fun update(input: Category): Boolean {
+    suspend fun update(input: Category): Boolean {
         require(input.id != 0L) { "Id is required to update." }
         require(input.name.isNotBlank()) { "Category name is required." }
-        return data.updateCategory(input)
+        return data.updateCategorySuspend(input)
     }
 
-    fun delete(id: Long): Boolean = data.deleteCategory(id)
+    suspend fun delete(id: String): Boolean = data.deleteCategorySuspend(id)
 }

@@ -1,32 +1,33 @@
 package com.example.expensenote
 
-// ============================================
-// DetailActivity.kt - Detail
-// ============================================
-
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.expensenote.Data.DataLocator
+import androidx.lifecycle.lifecycleScope
+import com.example.expensenote.Controller.TransactionController
+import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityDetailBinding
 import com.example.expensenote.entity.Transaction
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.launch
 
 class DetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDetailBinding
-    private var transactionId: Long = -1
+    private var transactionStringId: String = ""
     private var current: Transaction? = null
+    private val controller = TransactionController(RemoteDataManager)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        transactionId = intent.getLongExtra("TRANSACTION_ID", -1)
+        transactionStringId = intent.getStringExtra("TRANSACTION_STRING_ID") ?: ""
 
         setupToolbar()
         setupButtons()
@@ -45,7 +46,10 @@ class DetailActivity : AppCompatActivity() {
     private fun setupButtons() {
         binding.btnEdit.setOnClickListener {
             val intent = android.content.Intent(this, FormActivity::class.java)
-            intent.putExtra("TRANSACTION_ID", transactionId)
+            // IMPORTANTE: Pasar el stringId, no el transactionStringId local
+            current?.let {
+                intent.putExtra("TRANSACTION_STRING_ID", it.stringId)
+            }
             startActivity(intent)
         }
 
@@ -72,13 +76,29 @@ class DetailActivity : AppCompatActivity() {
     }
 
     private fun loadTransaction() {
-        val tx = DataLocator.data.getTransaction(transactionId)
-        if (tx == null) {
-            finish()
-            return
+        lifecycleScope.launch {
+            try {
+                val tx = controller.get(transactionStringId)
+                if (tx == null) {
+                    Toast.makeText(
+                        this@DetailActivity,
+                        "Transaction not found",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    finish()
+                    return@launch
+                }
+                current = tx
+                displayTransaction(tx)
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@DetailActivity,
+                    "Error loading transaction: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
+            }
         }
-        current = tx
-        displayTransaction(tx)
     }
 
     private fun displayTransaction(transaction: Transaction) {
@@ -86,24 +106,48 @@ class DetailActivity : AppCompatActivity() {
             tvDetailAmount.text = formatCurrency(kotlin.math.abs(transaction.amount))
             val typeLabel = transaction.type.name.lowercase().replaceFirstChar { it.titlecase() }
             tvDetailType.text = "$typeLabel • ${transaction.category}"
-            tvDetailCategory.text = "🍔 ${transaction.category}" // could map emoji by category
+            tvDetailCategory.text = "📌 ${transaction.category}"
             tvDetailDate.text = transaction.date
             tvDetailTransactionType.text = typeLabel
             tvDetailNote.text = transaction.note
 
+            // Cargar imagen desde URL
             when {
-                transaction.photoBitmap != null -> ivReceiptPhoto.setImageBitmap(transaction.photoBitmap)
-                transaction.photoUri != null -> ivReceiptPhoto.setImageURI(Uri.parse(transaction.photoUri))
+                transaction.photoUri != null -> {
+                    // TODO: Usar Glide o Coil para cargar desde URL
+                    // Por ahora solo mostramos placeholder
+                    ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
+                }
                 else -> ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
             }
         }
     }
 
     private fun deleteTransaction() {
-        if (transactionId != -1L) {
-            DataLocator.data.deleteTransaction(transactionId)
-            Snackbar.make(binding.root, getString(R.string.transaction_deleted), Snackbar.LENGTH_SHORT).show()
-            finish()
+        lifecycleScope.launch {
+            try {
+                val success = controller.delete(transactionStringId)
+                if (success) {
+                    Snackbar.make(
+                        binding.root,
+                        getString(R.string.transaction_deleted),
+                        Snackbar.LENGTH_SHORT
+                    ).show()
+                    finish()
+                } else {
+                    Toast.makeText(
+                        this@DetailActivity,
+                        "Error deleting transaction",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@DetailActivity,
+                    "Error: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
