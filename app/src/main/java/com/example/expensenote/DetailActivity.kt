@@ -1,6 +1,5 @@
 package com.example.expensenote
 
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -46,7 +45,6 @@ class DetailActivity : AppCompatActivity() {
     private fun setupButtons() {
         binding.btnEdit.setOnClickListener {
             val intent = android.content.Intent(this, FormActivity::class.java)
-            // IMPORTANTE: Pasar el stringId, no el transactionStringId local
             current?.let {
                 intent.putExtra("TRANSACTION_STRING_ID", it.stringId)
             }
@@ -111,15 +109,37 @@ class DetailActivity : AppCompatActivity() {
             tvDetailTransactionType.text = typeLabel
             tvDetailNote.text = transaction.note
 
-            // Cargar imagen desde URL
-            when {
-                transaction.photoUri != null -> {
-                    // TODO: Usar Glide o Coil para cargar desde URL
-                    // Por ahora solo mostramos placeholder
-                    ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
+            // Cargar imagen desde URL con Glide
+            if (transaction.photoUri != null) {
+                com.bumptech.glide.Glide.with(this@DetailActivity)
+                    .load(transaction.photoUri)
+                    .placeholder(R.drawable.ic_receipt_placeholder)
+                    .error(R.drawable.ic_receipt_placeholder)
+                    .centerCrop()
+                    .into(ivReceiptPhoto)
+                ivReceiptPhoto.setOnClickListener {
+                    openImageFullScreen(transaction.photoUri)
                 }
-                else -> ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
+            } else {
+                ivReceiptPhoto.setImageResource(R.drawable.ic_receipt_placeholder)
+                ivReceiptPhoto.setOnClickListener(null)
             }
+        }
+    }
+
+    private fun openImageFullScreen(imageUrl: String) {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(android.net.Uri.parse(imageUrl), "image/*")
+        }
+
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "No se puede abrir la imagen",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 

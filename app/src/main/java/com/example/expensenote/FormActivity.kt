@@ -34,11 +34,12 @@ class FormActivity : AppCompatActivity() {
     private var selectedType: TransactionType = TransactionType.EXPENSE
     private var selectedDate: Date = Date()
     private var photoUri: Uri? = null
-    private var transactionStringId: String? = null  // Firebase usa String IDs
+    private var transactionStringId: String? = null
 
     // Bitmap kept in memory to store on save (as required by the task)
     private var selectedReceiptBitmap: Bitmap? = null
-    private var uploadedPhotoUrl: String? = null  // URL devuelta por el API
+    private var uploadedPhotoUrl: String? = null
+    private var hasNewPhoto: Boolean = false
 
     // Pick from gallery
     private val pickImageLauncher = registerForActivityResult(
@@ -48,6 +49,7 @@ class FormActivity : AppCompatActivity() {
             photoUri = it
             selectedReceiptBitmap = decodeBitmapFromUri(it)
             showPreview(selectedReceiptBitmap)
+            hasNewPhoto = true
         }
     }
 
@@ -58,6 +60,7 @@ class FormActivity : AppCompatActivity() {
         if (success && photoUri != null) {
             selectedReceiptBitmap = decodeBitmapFromUri(photoUri!!)
             showPreview(selectedReceiptBitmap)
+            hasNewPhoto = true
         }
     }
 
@@ -224,25 +227,25 @@ class FormActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 // 1. Subir imagen si hay una nueva
-                if (selectedReceiptBitmap != null && uploadedPhotoUrl == null) {
+                if (hasNewPhoto && selectedReceiptBitmap != null) {
                     val base64 = bitmapToBase64(selectedReceiptBitmap!!)
                     uploadedPhotoUrl = RemoteDataManager.uploadImageSuspend(base64)
                 }
+                // Si no hay nueva foto, mantener la URL existente (uploadedPhotoUrl)
 
                 // 2. Crear objeto Transaction
                 val tx = Transaction(
-                    id = 0, // No usado
-                    stringId = transactionStringId ?: "", // IMPORTANTE: Usar el stringId guardado
+                    id = 0,
+                    stringId = transactionStringId ?: "",
                     amount = if (selectedType == TransactionType.EXPENSE) -amount else amount,
                     category = category,
                     type = selectedType,
                     date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(selectedDate),
                     note = note,
                     photoUri = uploadedPhotoUrl,  // Guardar URL de Firebase Storage
-                    photoBitmap = null  // No guardamos Bitmap en API
+                    photoBitmap = null
                 )
 
-                // DEBUG: Verificar el stringId antes de actualizar
                 android.util.Log.d("FormActivity", "Updating with stringId: ${tx.stringId}")
 
                 // 3. Crear o actualizar
@@ -293,7 +296,6 @@ class FormActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // IMPORTANTE: Guardar el stringId para poder editar
                 transactionStringId = tx.stringId
                 android.util.Log.d("FormActivity", "Loaded transaction, stringId: $transactionStringId")
 
@@ -315,8 +317,16 @@ class FormActivity : AppCompatActivity() {
                 // Cargar imagen si existe URL
                 tx.photoUri?.let { url ->
                     uploadedPhotoUrl = url
-                    // TODO: Cargar imagen desde URL con Glide/Coil si quieres mostrar preview
-                    // Por ahora solo guardamos la URL
+                    hasNewPhoto = false
+
+                    // Cargar imagen desde URL con Glide
+                    com.bumptech.glide.Glide.with(this@FormActivity)
+                        .load(url)
+                        .placeholder(R.drawable.ic_receipt_placeholder)
+                        .error(R.drawable.ic_receipt_placeholder)
+                        .into(binding.ivPhotoPreview)
+
+                    binding.ivPhotoPreview.visibility = View.VISIBLE
                 }
             } catch (e: Exception) {
                 Toast.makeText(
