@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.example.expensenote.Controller.CategoryController
 import com.example.expensenote.Controller.TransactionController
 import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityFormBinding
@@ -29,7 +30,8 @@ import java.util.*
 class FormActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFormBinding
-    private val controller = TransactionController(RemoteDataManager)
+    private val transactionController = TransactionController(RemoteDataManager)
+    private val categoryController = CategoryController(RemoteDataManager)
 
     private var selectedType: TransactionType = TransactionType.EXPENSE
     private var selectedDate: Date = Date()
@@ -40,6 +42,7 @@ class FormActivity : AppCompatActivity() {
     private var selectedReceiptBitmap: Bitmap? = null
     private var uploadedPhotoUrl: String? = null
     private var hasNewPhoto: Boolean = false
+    private var categoryNames = listOf<String>()
 
     // Pick from gallery
     private val pickImageLauncher = registerForActivityResult(
@@ -76,7 +79,7 @@ class FormActivity : AppCompatActivity() {
 
         setupToolbar()
         setupTypeSelector()
-        setupCategorySpinner()
+        loadCategories()
         setupDatePicker()
         setupPhotoUpload()
         setupButtons()
@@ -124,17 +127,27 @@ class FormActivity : AppCompatActivity() {
     }
 
     private fun setupCategorySpinner() {
-        val categories = arrayOf(
-            "Food",
-            "Transport",
-            "Health",
-            "Entertainment",
-            "Home",
-            "Salary",
-            "Other"
-        )
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categories)
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
         binding.actvCategory.setAdapter(adapter)
+    }
+
+    private fun loadCategories() {
+        lifecycleScope.launch {
+            try {
+                val categories = categoryController.list()
+                categoryNames = categories.map { it.name }
+                setupCategorySpinner()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@FormActivity,
+                    "Error cargando categorías: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                // Fallback a categorías por defecto
+                categoryNames = listOf("Food", "Transport", "Health", "Entertainment", "Home", "Salary", "Other")
+                setupCategorySpinner()
+            }
+        }
     }
 
     private fun setupDatePicker() {
@@ -246,11 +259,12 @@ class FormActivity : AppCompatActivity() {
                     photoBitmap = null
                 )
 
+                // DEBUG: Verificar el stringId antes de actualizar
                 android.util.Log.d("FormActivity", "Updating with stringId: ${tx.stringId}")
 
                 // 3. Crear o actualizar
                 if (createMode) {
-                    val created = controller.create(tx)
+                    val created = transactionController.create(tx)
                     if (created != null) {
                         Snackbar.make(
                             binding.root,
@@ -262,7 +276,7 @@ class FormActivity : AppCompatActivity() {
                         Toast.makeText(this@FormActivity, "Error creating transaction", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    val updated = controller.update(tx)
+                    val updated = transactionController.update(tx)
                     if (updated) {
                         Snackbar.make(
                             binding.root,
@@ -289,7 +303,7 @@ class FormActivity : AppCompatActivity() {
             try {
                 android.util.Log.d("FormActivity", "Loading transaction with ID: $id")
 
-                val tx = controller.get(id)
+                val tx = transactionController.get(id)
                 if (tx == null) {
                     Toast.makeText(this@FormActivity, "Transaction not found", Toast.LENGTH_SHORT).show()
                     finish()
