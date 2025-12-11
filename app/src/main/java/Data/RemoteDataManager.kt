@@ -1,10 +1,6 @@
 package com.example.expensenote.Data
 
-import com.example.expensenote.Data.network.ApiService
-import com.example.expensenote.Data.network.CategoryDTO
-import com.example.expensenote.Data.network.RetrofitClient
-import com.example.expensenote.Data.network.TransactionDTO
-import com.example.expensenote.Data.network.UploadRequest
+import com.example.expensenote.Data.network.*
 import com.example.expensenote.entity.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -197,7 +193,7 @@ object RemoteDataManager : IDataManager {
 
     suspend fun updateCategorySuspend(cat: Category): Boolean = withContext(Dispatchers.IO) {
         try {
-            val id = cat.id.toString()
+            val id = cat.stringId.ifEmpty { return@withContext false }
             val dto = cat.toDTO()
             val response = api.updateCategory(id, dto)
             response.success
@@ -274,6 +270,7 @@ object RemoteDataManager : IDataManager {
     private fun CategoryDTO.toCategory(): Category {
         return Category(
             id = id.hashCode().toLong(),
+            stringId = id,
             name = name,
             color = color,
             icon = icon
@@ -282,7 +279,7 @@ object RemoteDataManager : IDataManager {
 
     private fun Category.toDTO(): CategoryDTO {
         return CategoryDTO(
-            id = if (id == 0L) "" else id.toString(),
+            id = stringId.ifEmpty { "" },
             name = name,
             color = color,
             icon = icon

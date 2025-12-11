@@ -1,11 +1,14 @@
 package com.example.expensenote
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
 import com.example.expensenote.Controller.TransactionController
 import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityDetailBinding
@@ -44,7 +47,7 @@ class DetailActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.btnEdit.setOnClickListener {
-            val intent = android.content.Intent(this, FormActivity::class.java)
+            val intent = Intent(this, FormActivity::class.java)
             current?.let {
                 intent.putExtra("TRANSACTION_STRING_ID", it.stringId)
             }
@@ -111,7 +114,7 @@ class DetailActivity : AppCompatActivity() {
 
             // Cargar imagen desde URL con Glide
             if (transaction.photoUri != null) {
-                com.bumptech.glide.Glide.with(this@DetailActivity)
+                Glide.with(this@DetailActivity)
                     .load(transaction.photoUri)
                     .placeholder(R.drawable.ic_receipt_placeholder)
                     .error(R.drawable.ic_receipt_placeholder)
@@ -128,8 +131,8 @@ class DetailActivity : AppCompatActivity() {
     }
 
     private fun openImageFullScreen(imageUrl: String) {
-        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-            setDataAndType(android.net.Uri.parse(imageUrl), "image/*")
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse(imageUrl), "image/*")
         }
 
         try {
@@ -177,7 +180,6 @@ class DetailActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Reload in case it was edited
         loadTransaction()
     }
 }

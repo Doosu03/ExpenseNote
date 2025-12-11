@@ -1,9 +1,6 @@
 package com.example.expensenote
 
-import android.app.DatePickerDialog
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -15,11 +12,9 @@ import com.example.expensenote.Controller.TransactionController
 import com.example.expensenote.Data.RemoteDataManager
 import com.example.expensenote.databinding.ActivityFiltersBinding
 import com.example.expensenote.entity.Category
-import com.example.expensenote.entity.TransactionQuery
 import com.example.expensenote.entity.TransactionType
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 
 class FiltersActivity : AppCompatActivity() {
@@ -115,7 +110,6 @@ class FiltersActivity : AppCompatActivity() {
     }
 
     private fun displayCategories(categories: List<Category>) {
-        // Limpiar el contenedor de categorías (lo crearemos dinámicamente)
         val categoriesContainer = findViewById<LinearLayout>(R.id.llCategoriesContainer)
         categoriesContainer?.removeAllViews()
 
@@ -131,10 +125,10 @@ class FiltersActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = 24 // 10dp en px
+                bottomMargin = 24
             }
-            radius = 30f // 10dp
-            strokeWidth = 6 // 2dp
+            radius = 30f
+            strokeWidth = 6
             strokeColor = getColor(R.color.stroke)
             cardElevation = 0f
             setCardBackgroundColor(getColor(R.color.background_light))
@@ -142,7 +136,7 @@ class FiltersActivity : AppCompatActivity() {
 
         val contentLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(36, 36, 36, 36) // 12dp
+            setPadding(36, 36, 36, 36)
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
 
@@ -150,7 +144,6 @@ class FiltersActivity : AppCompatActivity() {
             buttonTintList = getColorStateList(R.color.primary)
             setOnCheckedChangeListener { _, isChecked ->
                 updateCategorySelection(category.id, isChecked)
-                // Actualizar el stroke del card
                 card.strokeColor = if (isChecked) {
                     getColor(R.color.primary)
                 } else {
@@ -170,15 +163,15 @@ class FiltersActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             ).apply {
-                marginStart = 24 // 8dp
+                marginStart = 24
             }
         }
 
         val countText = TextView(this).apply {
-            text = "0 movimientos" // Se actualizará dinámicamente
+            text = "0 movimientos"
             textSize = 13f
             setTextColor(getColor(R.color.text_secondary))
-            tag = "count_${category.id}" // Para actualizar después
+            tag = "count_${category.id}"
         }
 
         contentLayout.addView(checkbox)
@@ -190,7 +183,8 @@ class FiltersActivity : AppCompatActivity() {
     }
 
     private fun getCategoryIcon(categoryName: String): String {
-        return when (categoryName) {
+        val category = allCategories.find { it.name == categoryName }
+        return category?.icon ?: when (categoryName) {
             "Food" -> "🍔"
             "Transport" -> "🚌"
             "Health" -> "🏥"
@@ -244,7 +238,6 @@ class FiltersActivity : AppCompatActivity() {
     }
 
     private fun applyFilters() {
-        // Convertir selectedCategoryIds (Long) a nombres de categorías (String)
         val selectedCategoryNames = allCategories
             .filter { selectedCategoryIds.contains(it.id) }
             .map { it.name }
@@ -278,8 +271,6 @@ class FiltersActivity : AppCompatActivity() {
                         .map { it.name }
                     filteredTransactions = filteredTransactions.filter { categoryNames.contains(it.category) }
                 }
-
-                // TODO: Filtrar por rango de fechas cuando se implemente
 
                 val count = filteredTransactions.size
                 binding.tvResultsCount.text = "$count movimientos"
